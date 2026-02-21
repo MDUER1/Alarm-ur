@@ -1,42 +1,83 @@
-# Marcus D. Duer
-"""Dette er en simpel alarm, som vækker dig efter den tid  som du har sat den til"""
+"""Konsolbaseret alarmur.
 
-from datetime import datetime
+Programmet beder brugeren om et tidspunkt i formatet ``HH:MM`` og venter,
+indtil tidspunktet nås. Når alarmen går i gang, afspilles et bip gentagne
+gange, indtil brugeren trykker ``x``.
+
+Bemærk:
+- Programmet er designet til Windows, da det bruger ``winsound`` og ``msvcrt``.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
 import time
 import winsound
-import msvcrt  # giver adgang til tastetryk uden Enter
+import msvcrt
 
-# variabler
-nu = datetime.now()
-angiv_sluttid = input("Angiv tidsafstanden til alarmen går af (HH:MM): ")
+# Saml centrale indstillinger som konstanter, så adfærd kan justeres ét sted.
+CHECK_INTERVAL_SECONDS = 1.0
+BEEP_FREQUENCY_HZ = 1000
+BEEP_DURATION_MS = 150
+STOP_KEY = "x"  # Brugeren stopper alarmen ved at trykke denne tast.
 
-# Konverter tekst til tidspunkt (strp: string Parse)
-aktuel_sluttid = datetime.strptime(angiv_sluttid, "%H:%M")
 
-# Erstat dato til nuværende dato
-aktuel_sluttid = aktuel_sluttid.replace(
-    year=nu.year, month=nu.month, day=nu.day)
+def parse_alarm_time(raw_value: str, now: datetime) -> datetime:
+    """Konvertér brugerinput (HH:MM) til næste gyldige alarmtidspunkt.
 
-# Angiv tid til bruger
-print(f"Du har nu sat sluttidspunktet til {aktuel_sluttid}")
+    Hvis brugeren vælger et tidspunkt tidligere end nu, planlægges alarmen
+    automatisk til næste dag.
+    """
+    candidate_time = datetime.strptime(raw_value.strip(), "%H:%M")
+    alarm_time = candidate_time.replace(year=now.year, month=now.month, day=now.day)
 
-# Kør alarmen - betingelse != er ikke gyldig, da tiden er for præcis med mikrosekunder
-while datetime.now() < aktuel_sluttid:
-    time.sleep(1)  # tjek tid -> pause 1 sekund -> repeat
+    # Hvis tidspunktet allerede er passeret i dag, flyttes alarmen til i morgen.
+    if alarm_time <= now:
+        alarm_time += timedelta(days=1)
 
-# Loop hopper først videre her efter betingelsen ikke opfyldes
-print("⏰Tiden er gået!⏰")
+    return alarm_time
 
-# afspil biplyd, indtil bruger stopper den
 
-while True:
-    winsound.Beep(1000, 100)
-    time.sleep(0.1)
+def ask_for_alarm_time() -> datetime:
+    """Indhent tidspunkt fra brugeren med validering af inputformat."""
+    while True:
+        raw_value = input("Angiv tidspunkt for alarm (HH:MM): ")
+        now = datetime.now()
 
-    if msvcrt.kbhit():  # tjekker om der er trykket en tast
-        key = msvcrt.getwch()
-        if key.lower() == "x":
-            print("Du har stoppet alarmen nu.")
+        try:
+            return parse_alarm_time(raw_value, now)
+        except ValueError:
+            # Giv tydelig fejlmeddelelse og prøv igen i stedet for at crashe.
+            print("Ugyldigt format. Brug venligst HH:MM, fx 07:30.")
+
+
+def wait_until_alarm(alarm_time: datetime) -> None:
+    """Vent i loop, indtil alarmtidspunktet er nået."""
+    while datetime.now() < alarm_time:
+        time.sleep(CHECK_INTERVAL_SECONDS)
+
+
+def play_alarm_until_stopped() -> None:
+    """Afspil biplyde kontinuerligt, indtil brugeren trykker stop-tasten."""
+    print(f"⏰ Alarmen ringer! Tryk '{STOP_KEY}' for at stoppe. ⏰")
+
+    while True:
+        winsound.Beep(BEEP_FREQUENCY_HZ, BEEP_DURATION_MS)
+
+        # msvcrt.kbhit() gør det muligt at læse tastetryk uden Enter.
+        if msvcrt.kbhit() and msvcrt.getwch().lower() == STOP_KEY:
+            print("Alarmen er stoppet.")
             break
-        else:
-            continue  # ignorer de andre taster
+
+
+def main() -> None:
+    """Entrypoint for alarmprogrammet."""
+    alarm_time = ask_for_alarm_time()
+
+    print(f"Alarm sat til: {alarm_time:%Y-%m-%d %H:%M}")
+    wait_until_alarm(alarm_time)
+    play_alarm_until_stopped()
+
+
+if __name__ == "__main__":
+    main()
