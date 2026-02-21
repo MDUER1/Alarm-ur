@@ -20,6 +20,7 @@ CHECK_INTERVAL_SECONDS = 1.0
 BEEP_FREQUENCY_HZ = 1000
 BEEP_DURATION_MS = 150
 STOP_KEY = "x"  # Brugeren stopper alarmen ved at trykke denne tast.
+ALARM_TRIGGER_MESSAGE = "good morning"
 
 
 def parse_alarm_time(raw_value: str, now: datetime) -> datetime:
@@ -60,6 +61,7 @@ def wait_until_alarm(alarm_time: datetime) -> None:
 def play_alarm_until_stopped() -> None:
     """Afspil biplyde kontinuerligt, indtil brugeren trykker stop-tasten."""
     print(f"⏰ Alarmen ringer! Tryk '{STOP_KEY}' for at stoppe. ⏰")
+    print(ALARM_TRIGGER_MESSAGE)
 
     while True:
         winsound.Beep(BEEP_FREQUENCY_HZ, BEEP_DURATION_MS)
